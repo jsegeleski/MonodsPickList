@@ -1,0 +1,118 @@
+/* --------- IMAGE WRAPPER --------- */
+.thumbnail-wrapper {
+  width: 100px;
+  height: 100px;
+  overflow: hidden;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.thumbnail-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* --------- PICKED INPUT COLUMN --------- */
+.picked-input-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  text-align: right;
+  font-size: 0.875rem;
+  gap: 4px;
+  padding-right: 8px;
+}
+
+/* --------- PICKED LINE --------- */
+.picked-bubble {
+  background-color: #e6efff;
+  padding: 4px 8px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.picked-bubble .bold {
+  font-weight: 600;
+}
+
+.picked-input-wrapper input {
+  width: 40px;
+  padding: 2px 4px;
+  font-size: 10px;
+}
+
+/* --------- PRINT STYLES --------- */
+@media print {
+  html, body {
+    zoom: 0.85; /* or try 0.75 if you want tighter */
+    transform: scale(1);
+    transform-origin: top left;
+  }
+
+  .print-content {
+    width: 100%;
+    max-width: 100%;
+    margin: 0 auto;
+    overflow: visible;
+    page-break-inside: avoid;
+  }
+
+  /* Prevent layout shifts in print */
+  .picked-input-wrapper {
+    align-items: flex-end;
+    justify-content: center;
+    font-size: 0.875rem;
+    text-align: right;
+    gap: 4px;
+  }
+
+  .picked-bubble {
+    background-color: #e6efff !important;
+    padding: 4px 8px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.875rem;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .picked-bubble .bold {
+    font-weight: 600;
+  }
+
+  .Polaris-ResourceItem {
+    page-break-inside: avoid !important;
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+    border-bottom: 1px solid #ccc;
+  }
+
+  .Polaris-Thumbnail--sizeLarge {
+    width: 64px !important;
+    height: 64px !important;
+  }
+
+  .product-title {
+    font-size: 1rem;
+    font-weight: 600;
+    display: block;
+  }
+
+  /* Avoid margin collapse and squishing */
+  .Polaris-Stack {
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+  }
+
+  .no-break {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    display: block;
+  }
+}
