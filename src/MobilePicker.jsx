@@ -6,9 +6,12 @@ import usePickListData from './usePickListData'
 function readProgress(storageKey) {
   try {
     const stored = JSON.parse(window.localStorage.getItem(storageKey) || '[]')
-    return new Set(Array.isArray(stored) ? stored : [])
+    if (Array.isArray(stored)) {
+      return Object.fromEntries(stored.map((id) => [id, Number.MAX_SAFE_INTEGER]))
+    }
+    return stored && typeof stored === 'object' ? stored : {}
   } catch {
-    return new Set()
+    return {}
   }
 }
 
@@ -22,21 +25,25 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
   const storageKey = useMemo(() => (
     `monods-mobile-pick:${selectedOrders.map((order) => order.id).sort().join('-')}`
   ), [selectedOrders])
-  const [pickedIds, setPickedIds] = useState(() => readProgress(storageKey))
+  const [pickedQuantities, setPickedQuantities] = useState(() => readProgress(storageKey))
   const [currentIndex, setCurrentIndex] = useState(0)
   const [expandedImage, setExpandedImage] = useState(false)
+  const [finishing, setFinishing] = useState(false)
+  const [finishError, setFinishError] = useState('')
   const positionedInitialItem = useRef(false)
 
   useEffect(() => {
     if (orderedItems.length === 0 || positionedInitialItem.current) return
-    const firstUnpicked = orderedItems.findIndex((item) => !pickedIds.has(item.id))
+    const firstUnpicked = orderedItems.findIndex(
+      (item) => Math.min(Number(pickedQuantities[item.id]) || 0, item.quantity) < item.quantity,
+    )
     setCurrentIndex(firstUnpicked === -1 ? orderedItems.length - 1 : firstUnpicked)
     positionedInitialItem.current = true
-  }, [orderedItems, pickedIds])
+  }, [orderedItems, pickedQuantities])
 
   useEffect(() => {
-    window.localStorage.setItem(storageKey, JSON.stringify([...pickedIds]))
-  }, [pickedIds, storageKey])
+    window.localStorage.setItem(storageKey, JSON.stringify(pickedQuantities))
+  }, [pickedQuantities, storageKey])
 
   useEffect(() => {
     if (!expandedImage) return undefined
@@ -54,28 +61,36 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
     }
   }, [expandedImage])
 
-  const validPickedIds = useMemo(
-    () => new Set([...pickedIds].filter((id) => orderedItems.some((item) => item.id === id))),
-    [orderedItems, pickedIds],
+  const totalUnits = useMemo(
+    () => orderedItems.reduce((total, item) => total + item.quantity, 0),
+    [orderedItems],
   )
-  const pickedCount = validPickedIds.size
+  const pickedUnits = useMemo(() => orderedItems.reduce((total, item) => (
+    total + Math.min(Number(pickedQuantities[item.id]) || 0, item.quantity)
+  ), 0), [orderedItems, pickedQuantities])
   const currentItem = orderedItems[currentIndex]
-  const isComplete = orderedItems.length > 0 && pickedCount === orderedItems.length
-  const progress = orderedItems.length ? Math.round((pickedCount / orderedItems.length) * 100) : 0
+  const currentPickedQuantity = currentItem
+    ? Math.min(Number(pickedQuantities[currentItem.id]) || 0, currentItem.quantity)
+    : 0
+  const isComplete = totalUnits > 0 && pickedUnits === totalUnits
+  const progress = totalUnits ? Math.round((pickedUnits / totalUnits) * 100) : 0
 
-  function toggleCurrentItem() {
+  function incrementCurrentItem() {
     if (!currentItem) return
 
-    setPickedIds((current) => {
-      const next = new Set(current)
-      const wasPicked = next.has(currentItem.id)
-      if (wasPicked) next.delete(currentItem.id)
-      else next.add(currentItem.id)
+    setPickedQuantities((current) => {
+      const currentQuantity = Math.min(Number(current[currentItem.id]) || 0, currentItem.quantity)
+      if (currentQuantity >= currentItem.quantity) return current
 
-      if (!wasPicked) {
+      const nextQuantity = currentQuantity + 1
+      const next = { ...current, [currentItem.id]: nextQuantity }
+
+      if (nextQuantity === currentItem.quantity) {
         for (let offset = 1; offset <= orderedItems.length; offset += 1) {
           const candidateIndex = (currentIndex + offset) % orderedItems.length
-          if (!next.has(orderedItems[candidateIndex].id)) {
+          const candidate = orderedItems[candidateIndex]
+          const candidatePicked = Math.min(Number(next[candidate.id]) || 0, candidate.quantity)
+          if (candidatePicked < candidate.quantity) {
             setCurrentIndex(candidateIndex)
             setExpandedImage(false)
             break
@@ -87,19 +102,48 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
     })
   }
 
+  function decrementCurrentItem() {
+    if (!currentItem || currentPickedQuantity === 0) return
+
+    setPickedQuantities((current) => ({
+      ...current,
+      [currentItem.id]: Math.max(0, currentPickedQuantity - 1),
+    }))
+  }
+
   function showItem(index) {
     setCurrentIndex(index)
     setExpandedImage(false)
   }
 
   function clearProgress() {
-    setPickedIds(new Set())
+    setPickedQuantities({})
     setCurrentIndex(0)
   }
 
-  function finishSession() {
-    window.localStorage.removeItem(storageKey)
-    onHome()
+  async function finishSession() {
+    setFinishing(true)
+    setFinishError('')
+
+    try {
+      const response = await fetch('/api/tag-orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderIds: [...new Set(selectedOrders.map((order) => order.id))],
+          tag: 'PLP-PICKED',
+        }),
+      })
+      if (!response.ok) throw new Error(`Saving picked status failed (${response.status})`)
+
+      window.localStorage.removeItem(storageKey)
+      onHome()
+    } catch (saveError) {
+      console.error('Failed to save picked order status', saveError)
+      setFinishError('Picked status could not be saved to Shopify. Please try again.')
+    } finally {
+      setFinishing(false)
+    }
   }
 
   if (loading) {
@@ -147,11 +191,11 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
           <button className="text-back" type="button" onClick={onHome}>Picking options</button>
         </header>
 
-        <section className="mobile-progress" aria-label={`${pickedCount} of ${orderedItems.length} products picked`}>
+        <section className="mobile-progress" aria-label={`${pickedUnits} of ${totalUnits} units picked`}>
           <div className="mobile-progress-copy">
             <div>
               <span className="mobile-eyebrow">MOBILE PICKING</span>
-              <Text variant="headingLg" as="h1">{pickedCount} of {orderedItems.length} picked</Text>
+              <Text variant="headingLg" as="h1">{pickedUnits} of {totalUnits} units picked</Text>
             </div>
             <strong>{progress}%</strong>
           </div>
@@ -163,10 +207,19 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
             <div className="completion-check">✓</div>
             <Text variant="headingXl" as="h2">That’s the lot.</Text>
             <p>
-              All {orderedItems.length} {orderedItems.length === 1 ? 'product' : 'products'} across{' '}
-              {selectedOrders.length} {selectedOrders.length === 1 ? 'order is' : 'orders are'} marked picked.
+              All {totalUnits} {totalUnits === 1 ? 'unit' : 'units'} for{' '}
+              {selectedOrders.length} {selectedOrders.length === 1 ? 'order' : 'orders'}{' '}
+              {totalUnits === 1 ? 'is' : 'are'} marked picked.
             </p>
-            <Button variant="primary" size="large" onClick={finishSession}>Finish and return home</Button>
+            <Button
+              variant="primary"
+              size="large"
+              loading={finishing}
+              onClick={finishSession}
+            >
+              Save picked status and finish
+            </Button>
+            {finishError ? <p className="finish-error" role="alert">{finishError}</p> : null}
             <button className="text-button" type="button" onClick={clearProgress}>Start this list over</button>
           </section>
         ) : (
@@ -200,12 +253,26 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
             </div>
 
             <button
-              className={`pick-action ${pickedIds.has(currentItem.id) ? 'is-picked' : ''}`}
+              className={`pick-action ${currentPickedQuantity === currentItem.quantity ? 'is-picked' : ''}`}
               type="button"
-              onClick={toggleCurrentItem}
+              onClick={incrementCurrentItem}
+              disabled={currentPickedQuantity === currentItem.quantity}
             >
-              {pickedIds.has(currentItem.id) ? '✓ Marked picked — undo' : `Mark ${currentItem.quantity} as picked`}
+              {currentPickedQuantity === currentItem.quantity
+                ? '✓ All units picked'
+                : `Mark 1 picked (${currentPickedQuantity + 1} of ${currentItem.quantity})`}
             </button>
+            <div className="partial-pick-status" aria-live="polite">
+              <span><strong>{currentPickedQuantity}</strong> of {currentItem.quantity} picked</span>
+              <button
+                className="text-button"
+                type="button"
+                onClick={decrementCurrentItem}
+                disabled={currentPickedQuantity === 0}
+              >
+                Undo one
+              </button>
+            </div>
 
             <div className="mobile-orders">
               <div className="detail-label">For these orders</div>
@@ -240,7 +307,11 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
           </div>
           <div className="queue-items">
             {orderedItems.map((item, index) => {
-              const picked = pickedIds.has(item.id)
+              const itemPickedQuantity = Math.min(
+                Number(pickedQuantities[item.id]) || 0,
+                item.quantity,
+              )
+              const picked = itemPickedQuantity === item.quantity
               return (
                 <button
                   className={`queue-item ${index === currentIndex ? 'is-current' : ''} ${picked ? 'is-picked' : ''}`}
@@ -252,6 +323,9 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
                   <span className="queue-thumbnail">
                     <img src={item.image} alt="" />
                     {picked ? <span className="queue-picked-check" aria-hidden="true">✓</span> : null}
+                    {!picked && itemPickedQuantity > 0 ? (
+                      <span className="queue-partial-count">{itemPickedQuantity}/{item.quantity}</span>
+                    ) : null}
                   </span>
                   <span className="queue-copy">
                     <strong>{item.productTitle}</strong>

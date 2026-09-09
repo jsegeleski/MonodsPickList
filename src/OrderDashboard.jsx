@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Badge, Button, Card, Checkbox, Page, Spinner, Text } from '@shopify/polaris'
 
-function formatPrintedAt(iso) {
-  if (!iso) return 'Previously printed'
+function formatPickingStatus(action, iso) {
+  if (!iso) return `${action} previously`
 
   const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return 'Previously printed'
+  if (Number.isNaN(date.getTime())) return `${action} previously`
 
-  return `Printed ${date.toLocaleString('en-CA', {
+  return `${action} ${date.toLocaleString('en-CA', {
+    year: 'numeric',
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
@@ -15,9 +16,9 @@ function formatPrintedAt(iso) {
   })}`
 }
 
-function getPrintedAtFromNotes(order) {
+function getNoteAttribute(order, name) {
   return order?.note_attributes?.find(
-    (attribute) => attribute?.name === 'pick_list_printed_at',
+    (attribute) => attribute?.name === name,
   )?.value
 }
 
@@ -35,6 +36,32 @@ function formatOrderDate(value) {
 function hasTag(order, expectedTag) {
   const tags = Array.isArray(order.tags) ? order.tags : String(order.tags || '').split(',')
   return tags.some((tag) => tag.trim() === expectedTag)
+}
+
+function PickingStatus({ order }) {
+  const pickedAt = getNoteAttribute(order, 'pick_list_picked_at')
+  const printedAt = getNoteAttribute(order, 'pick_list_printed_at')
+  const wasPicked = hasTag(order, 'PLP-PICKED') || Boolean(pickedAt)
+  const wasPrinted = hasTag(order, 'PLP') || Boolean(printedAt)
+
+  if (!wasPicked && !wasPrinted) {
+    return <span className="muted-text">Not started</span>
+  }
+
+  return (
+    <div className="picking-statuses">
+      {wasPicked ? (
+        <span className="picking-status picking-status--picked">
+          {formatPickingStatus('Picked', pickedAt)}
+        </span>
+      ) : null}
+      {wasPrinted ? (
+        <span className="picking-status picking-status--printed">
+          {formatPickingStatus('Printed', printedAt)}
+        </span>
+      ) : null}
+    </div>
+  )
 }
 
 function OrderDashboard({ workflow = 'print', onBack, onSelectOrders }) {
@@ -181,7 +208,7 @@ function OrderDashboard({ workflow = 'print', onBack, onSelectOrders }) {
                     <th>Total</th>
                     <th>Payment</th>
                     <th>Status</th>
-                    <th>Pick list</th>
+                    <th>Picking status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -227,11 +254,7 @@ function OrderDashboard({ workflow = 'print', onBack, onSelectOrders }) {
                           </Badge>
                         </td>
                         <td>
-                          {hasTag(order, 'PLP') ? (
-                            <Badge tone="success">
-                              {formatPrintedAt(getPrintedAtFromNotes(order))}
-                            </Badge>
-                          ) : <span className="muted-text">Not printed</span>}
+                          <PickingStatus order={order} />
                         </td>
                       </tr>
                     )

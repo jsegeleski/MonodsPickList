@@ -1,6 +1,11 @@
 // /api/tag-orders.js
 import axios from 'axios';
 
+const STATUS_CONFIG = {
+  PLP: { timestampKey: 'pick_list_printed_at' },
+  'PLP-PICKED': { timestampKey: 'pick_list_picked_at' },
+};
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -13,6 +18,11 @@ export default async function handler(req, res) {
   }
   if (!tag || typeof tag !== 'string') {
     return res.status(400).json({ error: 'Invalid or missing tag' });
+  }
+
+  const statusConfig = STATUS_CONFIG[tag];
+  if (!statusConfig) {
+    return res.status(400).json({ error: 'Unsupported order status tag' });
   }
 
   try {
@@ -34,16 +44,15 @@ export default async function handler(req, res) {
       const tagsArray = existingTags ? existingTags.split(',').map(t => t.trim()).filter(Boolean) : [];
       if (!tagsArray.includes(tag)) tagsArray.push(tag);
 
-      // Merge note_attributes: add/overwrite pick_list_printed_at
-      const printedKey = 'pick_list_printed_at';
-      const printedVal = new Date().toISOString(); // server-side ISO UTC
+      // Record a separate timestamp for printing and completed mobile picking.
+      const statusTimestamp = new Date().toISOString();
 
       const noteAttrs = Array.isArray(order.note_attributes) ? [...order.note_attributes] : [];
-      const idx = noteAttrs.findIndex(a => a?.name === printedKey);
+      const idx = noteAttrs.findIndex(a => a?.name === statusConfig.timestampKey);
       if (idx >= 0) {
-        noteAttrs[idx] = { name: printedKey, value: printedVal };
+        noteAttrs[idx] = { name: statusConfig.timestampKey, value: statusTimestamp };
       } else {
-        noteAttrs.push({ name: printedKey, value: printedVal });
+        noteAttrs.push({ name: statusConfig.timestampKey, value: statusTimestamp });
       }
 
       // 2) Update order with new tags + note_attributes
