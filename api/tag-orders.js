@@ -6,8 +6,6 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  console.log('[tag-orders] Received body:', req.body);
-
   const { orderIds, tag } = req.body;
 
   if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {

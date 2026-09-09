@@ -37,7 +37,7 @@ function hasTag(order, expectedTag) {
   return tags.some((tag) => tag.trim() === expectedTag)
 }
 
-function OrderDashboard({ onSelectOrders }) {
+function OrderDashboard({ workflow = 'print', onBack, onSelectOrders }) {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -105,15 +105,21 @@ function OrderDashboard({ onSelectOrders }) {
   }, [orders])
 
   const allSelected = orders.length > 0 && selectedIds.length === orders.length
+  const isMobileWorkflow = workflow === 'mobile'
 
   return (
     <Page>
-      <main className="orders-page">
+      <main className={`orders-page ${isMobileWorkflow ? 'orders-page--mobile' : ''}`}>
         <header className="screen-header">
           <div>
-            <Text variant="headingXl" as="h1">Create a pick list</Text>
+            {onBack ? <button className="text-back" type="button" onClick={onBack}>← Picking options</button> : null}
+            <Text variant="headingXl" as="h1">
+              {isMobileWorkflow ? 'Choose orders to pick' : 'Choose orders to print'}
+            </Text>
             <p className="screen-description">
-              Select open orders below. Shift-click a checkbox to select a range.
+              {isMobileWorkflow
+                ? 'Select the open orders you want to work through on this device.'
+                : 'Select open orders below. Shift-click a checkbox to select a range.'}
             </p>
           </div>
           <Button
@@ -121,7 +127,8 @@ function OrderDashboard({ onSelectOrders }) {
             onClick={() => onSelectOrders(selectedOrders)}
             disabled={selectedIds.length === 0}
           >
-            Create pick list{selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}
+            {isMobileWorkflow ? 'Start picking' : 'Create pick list'}
+            {selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}
           </Button>
         </header>
 

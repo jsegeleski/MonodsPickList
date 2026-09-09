@@ -5,8 +5,6 @@ import cors from 'cors'
 
 dotenv.config()
 
-console.log('👉 SHOPIFY_STORE_DOMAIN:', process.env.SHOPIFY_STORE_DOMAIN)
-console.log('👉 SHOPIFY_ADMIN_API_TOKEN:', process.env.SHOPIFY_ADMIN_API_TOKEN?.slice(0, 8) + '...')
 const app = express()
 app.use(cors())
 app.use(express.json())
@@ -196,7 +194,6 @@ app.post('/api/images', async (req, res) => {
     });
 
     const imageMap = {};
-    console.log('🧪 shopifyRes:', JSON.stringify(shopifyRes, null, 2));
     shopifyRes.data.nodes.forEach((node) => {
       const variantId = node?.id?.split('/').pop();
       const variantImage = node?.image?.url;

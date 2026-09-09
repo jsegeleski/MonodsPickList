@@ -12,20 +12,25 @@ import { BrowserRouter } from 'react-router-dom'
 
 // Get required params from the URL
 const urlParams = new URLSearchParams(window.location.search)
+const apiKey = import.meta.env.VITE_SHOPIFY_API_KEY
+const host = urlParams.get('host')
+
 const config = {
-  apiKey: import.meta.env.VITE_SHOPIFY_API_KEY,
-  host: urlParams.get('host'),
+  apiKey,
+  host,
   forceRedirect: true,
 }
+
+const app = (
+  <AppProvider i18n={{}}>
+    <App />
+  </AppProvider>
+)
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
-      <AppBridgeProvider config={config}>
-        <AppProvider i18n={{}}>
-          <App />
-        </AppProvider>
-      </AppBridgeProvider>
+      {apiKey && host ? <AppBridgeProvider config={config}>{app}</AppBridgeProvider> : app}
     </BrowserRouter>
   </React.StrictMode>,
 )
