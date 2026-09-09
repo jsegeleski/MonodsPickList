@@ -1,120 +1,240 @@
-// src/OrderDashboard.jsx
-import { useEffect, useState } from 'react'
-import { Page, Card, ResourceList, ResourceItem, Text, Button, Checkbox } from '@shopify/polaris'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Badge, Button, Card, Checkbox, Page, Spinner, Text } from '@shopify/polaris'
+
+function formatPrintedAt(iso) {
+  if (!iso) return 'Previously printed'
+
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return 'Previously printed'
+
+  return `Printed ${date.toLocaleString('en-CA', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })}`
+}
+
+function getPrintedAtFromNotes(order) {
+  return order?.note_attributes?.find(
+    (attribute) => attribute?.name === 'pick_list_printed_at',
+  )?.value
+}
+
+function formatStatus(status, fallback) {
+  if (!status) return fallback
+  return status.replaceAll('_', ' ').replace(/^./, (character) => character.toUpperCase())
+}
+
+function formatOrderDate(value) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function hasTag(order, expectedTag) {
+  const tags = Array.isArray(order.tags) ? order.tags : String(order.tags || '').split(',')
+  return tags.some((tag) => tag.trim() === expectedTag)
+}
 
 function OrderDashboard({ onSelectOrders }) {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [selectedIds, setSelectedIds] = useState([])
+  const [reloadKey, setReloadKey] = useState(0)
+  const lastSelectedIndex = useRef(null)
+  const shiftKeyPressed = useRef(false)
 
   useEffect(() => {
-    fetch('http://localhost:3001/api/orders')
-      .then((res) => res.json())
-      .then((data) => {
+    const controller = new AbortController()
+
+    async function loadOrders() {
+      setLoading(true)
+      setError('')
+
+      try {
+        const response = await fetch('/api/orders', { signal: controller.signal })
+        if (!response.ok) throw new Error(`Orders request failed (${response.status})`)
+
+        const data = await response.json()
+        if (!Array.isArray(data)) throw new Error('The orders response was not valid')
         setOrders(data)
-        setLoading(false)
-      })
-      .catch((err) => {
-        console.error('Failed to load orders', err)
-        setLoading(false)
-      })
-  }, [])
+      } catch (requestError) {
+        if (requestError.name !== 'AbortError') {
+          console.error('Failed to load orders', requestError)
+          setError('Orders could not be loaded. Please try again.')
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false)
+      }
+    }
 
-  const toggleOrder = (id) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    )
-  }
+    loadOrders()
+    return () => controller.abort()
+  }, [reloadKey])
 
-  const selectedOrders = orders.filter((order) => selectedIds.includes(order.id))
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds])
+  const selectedOrders = useMemo(
+    () => orders.filter((order) => selectedIdSet.has(order.id)),
+    [orders, selectedIdSet],
+  )
+
+  const updateSelection = useCallback((index, checked, useRange) => {
+    setSelectedIds((currentIds) => {
+      const nextIds = new Set(currentIds)
+      const hasAnchor = lastSelectedIndex.current !== null
+
+      if (useRange && hasAnchor) {
+        const start = Math.min(lastSelectedIndex.current, index)
+        const end = Math.max(lastSelectedIndex.current, index)
+        orders.slice(start, end + 1).forEach((order) => {
+          if (checked) nextIds.add(order.id)
+          else nextIds.delete(order.id)
+        })
+      } else if (checked) {
+        nextIds.add(orders[index].id)
+      } else {
+        nextIds.delete(orders[index].id)
+      }
+
+      return [...nextIds]
+    })
+
+    lastSelectedIndex.current = index
+  }, [orders])
+
+  const allSelected = orders.length > 0 && selectedIds.length === orders.length
 
   return (
     <Page>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <Text variant="headingLg" as="h2">Select Orders</Text>
-        <Button
-          primary
-          onClick={() => onSelectOrders(selectedOrders)}
-          disabled={selectedIds.length === 0}
-        >
-          Create Pick List
-        </Button>
-      </div>
+      <main className="orders-page">
+        <header className="screen-header">
+          <div>
+            <Text variant="headingXl" as="h1">Create a pick list</Text>
+            <p className="screen-description">
+              Select open orders below. Shift-click a checkbox to select a range.
+            </p>
+          </div>
+          <Button
+            variant="primary"
+            onClick={() => onSelectOrders(selectedOrders)}
+            disabled={selectedIds.length === 0}
+          >
+            Create pick list{selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}
+          </Button>
+        </header>
 
-      <Card>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-  <tr style={{ borderBottom: '1px solid #ccc' }}>
-    <th style={{ textAlign: 'left', padding: '0.75rem' }}>
-      <span
-        style={{
-          textDecoration: 'underline',
-          cursor: 'pointer',
-          fontSize: '0.65rem',
-          color: 'inherit' // uses default text color
-        }}
-        onClick={() => {
-          const allSelected = selectedIds.length === orders.length;
-          setSelectedIds(allSelected ? [] : orders.map(order => order.id));
-        }}
-      >
-        {selectedIds.length === orders.length ? 'Deselect All' : 'Select All'}
-      </span>
-    </th>
-    <th style={{ textAlign: 'left', padding: '0.75rem' }}>Order</th>
-    <th style={{ textAlign: 'left', padding: '0.75rem' }}>Date</th>
-    <th style={{ textAlign: 'left', padding: '0.75rem' }}>Customer</th>
-    <th style={{ textAlign: 'left', padding: '0.75rem' }}>Total</th>
-    <th style={{ textAlign: 'left', padding: '0.75rem' }}>Payment</th>
-    <th style={{ textAlign: 'left', padding: '0.75rem' }}>Status</th>
-  </tr>
-</thead>
-          <tbody>
-            {orders.map((order) => (
-              <tr key={order.id} style={{ borderBottom: '1px solid #eee' }}>
-                <td style={{ padding: '0.75rem' }}>
-                  <Checkbox
-                    checked={selectedIds.includes(order.id)}
-                    onChange={() => toggleOrder(order.id)}
-                  />
-                </td>
-                <td style={{ padding: '0.75rem' }}>
-  <a
-    href={`https://admin.shopify.com/store/monodsports-1394/orders/${order.id}`}
-    target="_blank"
-    rel="noopener noreferrer"
-    style={{ textDecoration: 'underline', color: '#333' }}
-  >
-    {order.name}
-  </a>
-</td>
-                <td style={{ padding: '0.75rem' }}>{new Date(order.created_at).toISOString().split('T')[0]}</td>
-                <td style={{ padding: '0.75rem' }}>
-                  {order.customer?.first_name} {order.customer?.last_name}
-                </td>
-                <td style={{ padding: '0.75rem' }}>
-                  ${parseFloat(order.total_price).toFixed(2)}
-                </td>
-                <td style={{ padding: '0.75rem' }}>
-                  {order.financial_status.charAt(0).toUpperCase() + order.financial_status.slice(1)}
-                </td>
-                <td style={{ padding: '0.75rem' }}>
-                  {order.fulfillment_status ? (
-                    <span style={{
-                      background: '#ffe58f',
-                      borderRadius: '999px',
-                      padding: '2px 8px',
-                      fontSize: '0.85rem'
-                    }}>
-                      {order.fulfillment_status.charAt(0).toUpperCase() + order.fulfillment_status.slice(1)}
-                    </span>
-                  ) : 'Unfulfilled'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
+        <Card>
+          <div className="selection-toolbar">
+            <div className="selection-actions">
+              <Button
+                variant="plain"
+                onClick={() => {
+                  setSelectedIds(allSelected ? [] : orders.map((order) => order.id))
+                  lastSelectedIndex.current = null
+                }}
+                disabled={loading || orders.length === 0}
+              >
+                {allSelected ? 'Deselect all' : 'Select all'}
+              </Button>
+              {selectedIds.length > 0 && !allSelected ? (
+                <Button variant="plain" onClick={() => setSelectedIds([])}>Clear selection</Button>
+              ) : null}
+            </div>
+            <span className="selection-count" aria-live="polite">
+              {selectedIds.length} of {orders.length} selected
+            </span>
+          </div>
+
+          {loading ? (
+            <div className="state-panel">
+              <Spinner accessibilityLabel="Loading orders" size="small" />
+              <Text as="p">Loading open orders…</Text>
+            </div>
+          ) : error ? (
+            <div className="state-panel state-panel--error" role="alert">
+              <Text as="p">{error}</Text>
+              <Button onClick={() => setReloadKey((key) => key + 1)}>Try again</Button>
+            </div>
+          ) : orders.length === 0 ? (
+            <div className="state-panel">
+              <Text variant="headingMd" as="h2">No open orders</Text>
+              <Text as="p" tone="subdued">There are no unfulfilled orders to pick right now.</Text>
+            </div>
+          ) : (
+            <div className="orders-table-wrap">
+              <table className="orders-table">
+                <thead>
+                  <tr>
+                    <th className="checkbox-column"><span className="visually-hidden">Select</span></th>
+                    <th>Order</th>
+                    <th>Date</th>
+                    <th>Customer</th>
+                    <th>Total</th>
+                    <th>Payment</th>
+                    <th>Status</th>
+                    <th>Pick list</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.map((order, index) => {
+                    const isSelected = selectedIdSet.has(order.id)
+                    const customerName = [order.customer?.first_name, order.customer?.last_name]
+                      .filter(Boolean)
+                      .join(' ')
+
+                    return (
+                      <tr key={order.id} className={isSelected ? 'is-selected' : undefined}>
+                        <td
+                          className="checkbox-column"
+                          onClickCapture={(event) => { shiftKeyPressed.current = event.shiftKey }}
+                        >
+                          <Checkbox
+                            label={`Select order ${order.name}`}
+                            labelHidden
+                            checked={isSelected}
+                            onChange={(checked) => {
+                              updateSelection(index, checked, shiftKeyPressed.current)
+                              shiftKeyPressed.current = false
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <a
+                            className="order-link"
+                            href={`https://admin.shopify.com/store/monodsports-1394/orders/${order.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            {order.name}
+                          </a>
+                        </td>
+                        <td>{formatOrderDate(order.created_at)}</td>
+                        <td>{customerName || 'Guest'}</td>
+                        <td>${Number(order.total_price || 0).toFixed(2)}</td>
+                        <td>{formatStatus(order.financial_status, 'Unknown')}</td>
+                        <td>
+                          <Badge tone={order.fulfillment_status ? 'attention' : 'warning'}>
+                            {formatStatus(order.fulfillment_status, 'Unfulfilled')}
+                          </Badge>
+                        </td>
+                        <td>
+                          {hasTag(order, 'PLP') ? (
+                            <Badge tone="success">
+                              {formatPrintedAt(getPrintedAtFromNotes(order))}
+                            </Badge>
+                          ) : <span className="muted-text">Not printed</span>}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+      </main>
     </Page>
   )
 }
