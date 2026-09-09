@@ -14,9 +14,7 @@ body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
-  background:
-    radial-gradient(circle at top right, rgb(220 239 229 / 55%), transparent 26rem),
-    #f6f6f7;
+  background: #f6f6f7;
 }
 
 html,
@@ -56,7 +54,7 @@ input {
 .text-button {
   padding: 0;
   border: 0;
-  color: #4b6f60;
+  color: #4a4a4a;
   background: transparent;
   font: inherit;
   font-size: 0.8125rem;
@@ -71,7 +69,7 @@ input {
 
 .text-back:hover,
 .text-button:hover {
-  color: #173f31;
+  color: #202223;
   text-decoration: underline;
 }
 
@@ -86,7 +84,7 @@ input {
 .home-eyebrow,
 .mobile-eyebrow {
   margin-bottom: 0.75rem;
-  color: #4b6f60;
+  color: #616161;
   font-size: 0.7rem;
   font-weight: 750;
   letter-spacing: 0.14em;
@@ -119,7 +117,7 @@ input {
   border-radius: 18px;
   color: #202223;
   background: rgb(255 255 255 / 92%);
-  box-shadow: 0 2px 4px rgb(0 0 0 / 3%), 0 14px 35px rgb(35 55 47 / 5%);
+  box-shadow: 0 2px 4px rgb(0 0 0 / 3%), 0 14px 35px rgb(0 0 0 / 5%);
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -128,14 +126,14 @@ input {
 
 .workflow-option:hover,
 .workflow-option:focus-visible {
-  border-color: #78a58f;
-  box-shadow: 0 4px 8px rgb(0 0 0 / 4%), 0 18px 42px rgb(35 55 47 / 12%);
+  border-color: #8c9196;
+  box-shadow: 0 4px 8px rgb(0 0 0 / 4%), 0 18px 42px rgb(0 0 0 / 10%);
   outline: none;
   transform: translateY(-3px);
 }
 
 .workflow-option--mobile {
-  background: linear-gradient(145deg, #f3faf7, #fff 65%);
+  background: rgb(255 255 255 / 92%);
 }
 
 .workflow-icon {
@@ -145,8 +143,8 @@ input {
   margin-bottom: 1.5rem;
   place-items: center;
   border-radius: 12px;
-  color: #315f4d;
-  background: #e1f1e9;
+  color: #4a4a4a;
+  background: #f0f1f1;
 }
 
 .workflow-icon svg {
@@ -160,7 +158,7 @@ input {
 
 .workflow-kicker {
   margin-bottom: 0.45rem;
-  color: #567266;
+  color: #6d7175;
   font-size: 0.68rem;
   font-weight: 750;
   letter-spacing: 0.1em;
@@ -181,7 +179,7 @@ input {
 
 .workflow-best {
   margin-top: auto;
-  color: #315f4d;
+  color: #4a4a4a;
   font-size: 0.75rem;
   font-weight: 650;
 }
@@ -190,7 +188,7 @@ input {
   position: absolute;
   right: 1.75rem;
   bottom: 1.55rem;
-  color: #315f4d;
+  color: #4a4a4a;
   font-size: 1.4rem;
   transition: transform 160ms ease;
 }
@@ -536,7 +534,7 @@ input {
   height: 8px;
   overflow: hidden;
   border-radius: 999px;
-  background: #dfe6e2;
+  background: #e3e3e3;
 }
 
 .progress-track span {
@@ -551,10 +549,10 @@ input {
 .completion-card,
 .pick-queue {
   overflow: hidden;
-  border: 1px solid #dfe3e1;
+  border: 1px solid #dedede;
   border-radius: 18px;
   background: #fff;
-  box-shadow: 0 10px 34px rgb(36 63 51 / 7%);
+  box-shadow: 0 10px 34px rgb(0 0 0 / 7%);
 }
 
 .mobile-product-card {
@@ -573,18 +571,27 @@ input {
   text-transform: uppercase;
 }
 
+.mobile-product-overview {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 0;
+  margin-bottom: 0.75rem;
+}
+
 .mobile-product-image {
   position: relative;
   display: grid;
-  width: 100%;
-  height: min(24svh, 220px);
-  min-height: 155px;
+  width: 112px;
+  height: 112px;
+  min-height: 0;
   padding: 0;
   overflow: hidden;
   place-items: center;
-  border: 0;
+  border: 1px solid #e3e3e3;
   border-radius: 13px;
-  background: #f7f8f8;
+  background: #fff;
   cursor: zoom-in;
 }
 
@@ -594,25 +601,13 @@ input {
   object-fit: contain;
 }
 
-.mobile-quantity-badge {
-  position: absolute;
-  right: 0.75rem;
-  bottom: 0.75rem;
-  padding: 0.45rem 0.7rem;
-  border-radius: 999px;
-  color: #fff;
-  background: #244e3e;
-  font-size: 0.8rem;
-  font-weight: 700;
-}
-
 .image-expand-icon {
   position: absolute;
-  top: 0.65rem;
-  right: 0.65rem;
+  top: 0.35rem;
+  right: 0.35rem;
   display: grid;
-  width: 2rem;
-  height: 2rem;
+  width: 1.65rem;
+  height: 1.65rem;
   place-items: center;
   border: 1px solid rgb(0 0 0 / 9%);
   border-radius: 8px;
@@ -631,17 +626,22 @@ input {
 }
 
 .mobile-product-details {
-  padding: 0.75rem 0.15rem 0.6rem;
+  min-width: 0;
+  padding: 0;
 }
 
 .mobile-product-details .product-vendor {
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.2rem;
+}
+
+.mobile-product-details h2 {
+  overflow-wrap: anywhere;
 }
 
 .mobile-variant {
   margin-top: 0.3rem;
   color: #444;
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   font-weight: 600;
 }
 
@@ -656,10 +656,10 @@ input {
   grid-template-columns: repeat(2, 1fr);
   gap: 1px;
   overflow: hidden;
-  margin-bottom: 1rem;
-  border: 1px solid #dfe3e1;
+  margin-bottom: 0.75rem;
+  border: 1px solid #dedede;
   border-radius: 10px;
-  background: #dfe3e1;
+  background: #dedede;
 }
 
 .mobile-facts > div {
@@ -667,7 +667,7 @@ input {
   padding: 0.7rem 0.85rem;
   align-items: center;
   justify-content: space-between;
-  background: #f8faf9;
+  background: #f7f7f7;
 }
 
 .mobile-facts span {
@@ -785,7 +785,7 @@ input {
 
 .queue-item {
   display: grid;
-  grid-template-columns: 2rem minmax(0, 1fr) auto;
+  grid-template-columns: 2.75rem minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.65rem;
   width: 100%;
@@ -800,8 +800,8 @@ input {
 }
 
 .queue-item.is-current {
-  border-color: #7caa95;
-  background: #f0f8f4;
+  border-color: #8c9196;
+  background: #fff;
 }
 
 .queue-item.is-picked {
@@ -809,23 +809,37 @@ input {
   background: #f4f7f5;
 }
 
-.queue-status {
-  display: grid;
-  width: 1.75rem;
-  height: 1.75rem;
-  place-items: center;
-  border: 1px solid #cbd2ce;
-  border-radius: 50%;
-  color: #4f5c56;
+.queue-thumbnail {
+  position: relative;
+  display: block;
+  width: 2.75rem;
+  height: 2.75rem;
+  overflow: hidden;
+  border: 1px solid #dedede;
+  border-radius: 7px;
   background: #fff;
-  font-size: 0.72rem;
-  font-weight: 700;
 }
 
-.queue-item.is-picked .queue-status {
-  border-color: #7eaa96;
+.queue-thumbnail > img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.queue-picked-check {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  display: grid;
+  width: 1.15rem;
+  height: 1.15rem;
+  place-items: center;
+  border: 1px solid #fff;
+  border-radius: 50%;
   color: #fff;
-  background: #4b8069;
+  background: #3f7d64;
+  font-size: 0.65rem;
+  font-weight: 750;
 }
 
 .queue-copy {
@@ -989,8 +1003,14 @@ input {
   }
 
   .mobile-product-image {
-    height: min(23svh, 205px);
-    min-height: 150px;
+    width: 96px;
+    height: 96px;
+    min-height: 0;
+  }
+
+  .mobile-product-overview {
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: 0.7rem;
   }
 }
 

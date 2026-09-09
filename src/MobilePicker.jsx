@@ -172,25 +172,26 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
         ) : (
           <section className="mobile-product-card">
             <div className="mobile-position">Product {currentIndex + 1} of {orderedItems.length}</div>
-            <button
-              className="mobile-product-image"
-              type="button"
-              onClick={() => setExpandedImage(true)}
-              aria-label={`Expand image for ${currentItem.productTitle}`}
-            >
-              <img src={currentItem.image} alt="" />
-              <span className="mobile-quantity-badge">Pick {currentItem.quantity}</span>
-              <span className="image-expand-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24">
-                  <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" />
-                </svg>
-              </span>
-            </button>
-            <div className="mobile-product-details">
-              <div className="product-vendor">{currentItem.vendor}</div>
-              <Text variant="headingXl" as="h2">{currentItem.productTitle}</Text>
-              {currentItem.attributes ? <div className="mobile-variant">{currentItem.attributes}</div> : null}
-              <div className="mobile-sku">SKU {currentItem.sku || 'not provided'}</div>
+            <div className="mobile-product-overview">
+              <button
+                className="mobile-product-image"
+                type="button"
+                onClick={() => setExpandedImage(true)}
+                aria-label={`Expand image for ${currentItem.productTitle}`}
+              >
+                <img src={currentItem.image} alt="" />
+                <span className="image-expand-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" />
+                  </svg>
+                </span>
+              </button>
+              <div className="mobile-product-details">
+                <div className="product-vendor">{currentItem.vendor}</div>
+                <Text variant="headingLg" as="h2">{currentItem.productTitle}</Text>
+                {currentItem.attributes ? <div className="mobile-variant">{currentItem.attributes}</div> : null}
+                <div className="mobile-sku">SKU {currentItem.sku || 'not provided'}</div>
+              </div>
             </div>
 
             <div className="mobile-facts">
@@ -248,7 +249,10 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
                   onClick={() => showItem(index)}
                   aria-pressed={index === currentIndex}
                 >
-                  <span className="queue-status">{picked ? '✓' : index + 1}</span>
+                  <span className="queue-thumbnail">
+                    <img src={item.image} alt="" />
+                    {picked ? <span className="queue-picked-check" aria-hidden="true">✓</span> : null}
+                  </span>
                   <span className="queue-copy">
                     <strong>{item.productTitle}</strong>
                     <span>{item.attributes || item.sku || 'No variant'}</span>
