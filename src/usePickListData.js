@@ -74,13 +74,22 @@ export default function usePickListData(selectedOrders) {
     const controller = new AbortController()
 
     async function loadPickList() {
+      const loadingStartedAt = Date.now()
       setLoading(true)
       setError('')
+
+      async function finishLoading() {
+        const remainingDelay = Math.max(0, 4000 - (Date.now() - loadingStartedAt))
+        if (remainingDelay > 0) {
+          await new Promise((resolve) => setTimeout(resolve, remainingDelay))
+        }
+        if (!controller.signal.aborted) setLoading(false)
+      }
 
       const pickItems = buildPickItems(selectedOrders)
       if (pickItems.length === 0) {
         setItems([])
-        setLoading(false)
+        await finishLoading()
         return
       }
 
@@ -111,7 +120,7 @@ export default function usePickListData(selectedOrders) {
           setError('The pick list could not be generated. Please try again.')
         }
       } finally {
-        if (!controller.signal.aborted) setLoading(false)
+        await finishLoading()
       }
     }
 

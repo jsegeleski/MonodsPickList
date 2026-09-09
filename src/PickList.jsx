@@ -54,7 +54,7 @@ function PickList({ selectedOrders, onBack, onHome }) {
     return (
       <Page>
         <div className="state-panel state-panel--large">
-          <FunnyLoading title="Building your printable list…" />
+          <FunnyLoading />
         </div>
       </Page>
     )

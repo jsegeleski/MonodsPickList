@@ -24,6 +24,7 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
   ), [selectedOrders])
   const [pickedIds, setPickedIds] = useState(() => readProgress(storageKey))
   const [currentIndex, setCurrentIndex] = useState(0)
+  const [expandedImage, setExpandedImage] = useState(false)
   const positionedInitialItem = useRef(false)
 
   useEffect(() => {
@@ -36,6 +37,22 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
   useEffect(() => {
     window.localStorage.setItem(storageKey, JSON.stringify([...pickedIds]))
   }, [pickedIds, storageKey])
+
+  useEffect(() => {
+    if (!expandedImage) return undefined
+
+    const previousOverflow = document.body.style.overflow
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setExpandedImage(false)
+    }
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', closeOnEscape)
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [expandedImage])
 
   const validPickedIds = useMemo(
     () => new Set([...pickedIds].filter((id) => orderedItems.some((item) => item.id === id))),
@@ -60,6 +77,7 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
           const candidateIndex = (currentIndex + offset) % orderedItems.length
           if (!next.has(orderedItems[candidateIndex].id)) {
             setCurrentIndex(candidateIndex)
+            setExpandedImage(false)
             break
           }
         }
@@ -67,6 +85,11 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
 
       return next
     })
+  }
+
+  function showItem(index) {
+    setCurrentIndex(index)
+    setExpandedImage(false)
   }
 
   function clearProgress() {
@@ -83,7 +106,7 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
     return (
       <Page narrowWidth>
         <div className="state-panel state-panel--large">
-          <FunnyLoading title="Getting your mobile pick ready…" />
+          <FunnyLoading />
         </div>
       </Page>
     )
@@ -149,10 +172,20 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
         ) : (
           <section className="mobile-product-card">
             <div className="mobile-position">Product {currentIndex + 1} of {orderedItems.length}</div>
-            <div className="mobile-product-image">
+            <button
+              className="mobile-product-image"
+              type="button"
+              onClick={() => setExpandedImage(true)}
+              aria-label={`Expand image for ${currentItem.productTitle}`}
+            >
               <img src={currentItem.image} alt="" />
               <span className="mobile-quantity-badge">Pick {currentItem.quantity}</span>
-            </div>
+              <span className="image-expand-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" />
+                </svg>
+              </span>
+            </button>
             <div className="mobile-product-details">
               <div className="product-vendor">{currentItem.vendor}</div>
               <Text variant="headingXl" as="h2">{currentItem.productTitle}</Text>
@@ -165,6 +198,14 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
               <div><span>On hand</span><strong>{currentItem.stock}</strong></div>
             </div>
 
+            <button
+              className={`pick-action ${pickedIds.has(currentItem.id) ? 'is-picked' : ''}`}
+              type="button"
+              onClick={toggleCurrentItem}
+            >
+              {pickedIds.has(currentItem.id) ? '✓ Marked picked — undo' : `Mark ${currentItem.quantity} as picked`}
+            </button>
+
             <div className="mobile-orders">
               <div className="detail-label">For these orders</div>
               {currentItem.orders.map((order) => (
@@ -174,24 +215,16 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
               ))}
             </div>
 
-            <button
-              className={`pick-action ${pickedIds.has(currentItem.id) ? 'is-picked' : ''}`}
-              type="button"
-              onClick={toggleCurrentItem}
-            >
-              {pickedIds.has(currentItem.id) ? '✓ Marked picked — undo' : `Mark ${currentItem.quantity} as picked`}
-            </button>
-
             <div className="mobile-navigation">
               <Button
                 disabled={currentIndex === 0}
-                onClick={() => setCurrentIndex((index) => Math.max(0, index - 1))}
+                onClick={() => showItem(Math.max(0, currentIndex - 1))}
               >
                 Previous
               </Button>
               <Button
                 disabled={currentIndex === orderedItems.length - 1}
-                onClick={() => setCurrentIndex((index) => Math.min(orderedItems.length - 1, index + 1))}
+                onClick={() => showItem(Math.min(orderedItems.length - 1, currentIndex + 1))}
               >
                 Next
               </Button>
@@ -212,7 +245,7 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
                   className={`queue-item ${index === currentIndex ? 'is-current' : ''} ${picked ? 'is-picked' : ''}`}
                   type="button"
                   key={item.id}
-                  onClick={() => setCurrentIndex(index)}
+                  onClick={() => showItem(index)}
                   aria-pressed={index === currentIndex}
                 >
                   <span className="queue-status">{picked ? '✓' : index + 1}</span>
@@ -226,6 +259,30 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
             })}
           </div>
         </section>
+
+        {expandedImage ? (
+          <div
+            className="image-lightbox"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Expanded image for ${currentItem.productTitle}`}
+            onClick={() => setExpandedImage(false)}
+          >
+            <button
+              className="lightbox-close"
+              type="button"
+              onClick={() => setExpandedImage(false)}
+              aria-label="Close expanded image"
+            >
+              ×
+            </button>
+            <img
+              src={currentItem.image}
+              alt={currentItem.productTitle}
+              onClick={(event) => event.stopPropagation()}
+            />
+          </div>
+        ) : null}
       </main>
     </Page>
   )
