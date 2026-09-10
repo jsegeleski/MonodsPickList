@@ -516,14 +516,12 @@ input {
   max-width: 620px;
   min-width: 0;
   margin: 0 auto;
-  padding: 0.75rem 0 3rem;
+  padding: 0.75rem 0 6.5rem;
   overflow-x: clip;
 }
 
 .mobile-header,
-.mobile-progress-copy,
-.queue-heading,
-.mobile-navigation {
+.mobile-progress-copy {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -576,8 +574,7 @@ input {
 }
 
 .mobile-product-card,
-.completion-card,
-.pick-queue {
+.completion-card {
   overflow: hidden;
   border: 1px solid #dedede;
   border-radius: 18px;
@@ -589,6 +586,8 @@ input {
   width: 100%;
   max-width: 100%;
   padding: 0.75rem;
+  scroll-margin-top: 0.75rem;
+  touch-action: pan-y;
 }
 
 .mobile-position {
@@ -815,17 +814,146 @@ input {
   text-decoration: none;
 }
 
-.mobile-navigation {
-  margin-top: 0.85rem;
+.mobile-bottom-nav {
+  position: fixed;
+  z-index: 100;
+  right: 0;
+  bottom: max(0.7rem, env(safe-area-inset-bottom));
+  left: 0;
+  display: grid;
+  grid-template-columns: 1fr 1.12fr 1fr;
+  gap: 0.3rem;
+  width: min(calc(100% - 1.5rem), 596px);
+  margin: 0 auto;
+  padding: 0.35rem;
+  border: 1px solid rgb(0 0 0 / 12%);
+  border-radius: 16px;
+  background: rgb(255 255 255 / 96%);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 18%);
+  backdrop-filter: blur(12px);
 }
 
-.pick-queue {
-  margin-top: 1rem;
-  padding: 1rem;
+.mobile-nav-button {
+  display: flex;
+  min-width: 0;
+  min-height: 3.15rem;
+  padding: 0.6rem 0.5rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border: 0;
+  border-radius: 12px;
+  color: #303030;
+  background: transparent;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
 }
 
-.queue-heading {
-  margin-bottom: 0.65rem;
+.mobile-nav-button:active:not(:disabled),
+.mobile-nav-button--list {
+  background: #f0f1f1;
+}
+
+.mobile-nav-button:disabled {
+  color: #a3a3a3;
+  cursor: default;
+}
+
+.mobile-nav-button svg {
+  width: 1.15rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.8;
+}
+
+.mobile-nav-count {
+  padding: 0.12rem 0.36rem;
+  border-radius: 999px;
+  color: #616161;
+  background: #fff;
+  font-size: 0.68rem;
+}
+
+.pick-list-modal {
+  position: fixed;
+  z-index: 10001;
+  inset: 0;
+  display: grid;
+  width: 100vw;
+  height: 100dvh;
+  padding: max(0.65rem, env(safe-area-inset-top)) max(0.65rem, env(safe-area-inset-right))
+    max(0.65rem, env(safe-area-inset-bottom)) max(0.65rem, env(safe-area-inset-left));
+  place-items: center;
+  background: rgb(18 18 18 / 48%);
+}
+
+.pick-list-modal-panel {
+  display: flex;
+  width: min(100%, 540px);
+  height: min(100%, 760px);
+  min-height: 0;
+  overflow: hidden;
+  flex-direction: column;
+  border: 1px solid rgb(255 255 255 / 70%);
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 22px 60px rgb(0 0 0 / 28%);
+}
+
+.pick-list-modal-header {
+  display: flex;
+  padding: 1rem 1rem 0.8rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid #e7e7e7;
+}
+
+.pick-list-modal-header p {
+  margin: 0.15rem 0 0;
+  color: #6d7175;
+  font-size: 0.8rem;
+}
+
+.modal-close-button {
+  display: grid;
+  width: 2.6rem;
+  height: 2.6rem;
+  padding: 0;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid #d8d8d8;
+  border-radius: 50%;
+  color: #303030;
+  background: #f7f7f7;
+  font: inherit;
+  font-size: 1.45rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pick-list-modal-actions {
+  display: flex;
+  padding: 0.65rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: #717171;
+  font-size: 0.72rem;
+}
+
+.pick-list-modal-actions .text-button {
+  flex: 0 0 auto;
+}
+
+.pick-list-modal-panel .queue-items {
+  min-height: 0;
+  padding: 0 0.65rem 0.75rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .queue-items {
@@ -1076,11 +1204,25 @@ input {
   }
 
   .mobile-product-card,
-  .pick-queue {
+  .completion-card {
     border-right: 0;
     border-left: 0;
     border-radius: 0;
     box-shadow: none;
+  }
+
+  .mobile-bottom-nav {
+    width: calc(100% - 1rem);
+  }
+
+  .pick-list-modal {
+    padding: max(0.45rem, env(safe-area-inset-top)) max(0.45rem, env(safe-area-inset-right))
+      max(0.45rem, env(safe-area-inset-bottom)) max(0.45rem, env(safe-area-inset-left));
+  }
+
+  .pick-list-modal-panel {
+    height: 100%;
+    border-radius: 18px;
   }
 
   .mobile-product-image {

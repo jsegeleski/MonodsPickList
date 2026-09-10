@@ -28,9 +28,14 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
   const [pickedQuantities, setPickedQuantities] = useState(() => readProgress(storageKey))
   const [currentIndex, setCurrentIndex] = useState(0)
   const [expandedImage, setExpandedImage] = useState(false)
+  const [listOpen, setListOpen] = useState(false)
   const [finishing, setFinishing] = useState(false)
   const [finishError, setFinishError] = useState('')
   const positionedInitialItem = useRef(false)
+  const productCardRef = useRef(null)
+  const listButtonRef = useRef(null)
+  const listCloseButtonRef = useRef(null)
+  const swipeStart = useRef(null)
 
   useEffect(() => {
     if (orderedItems.length === 0 || positionedInitialItem.current) return
@@ -46,11 +51,13 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
   }, [pickedQuantities, storageKey])
 
   useEffect(() => {
-    if (!expandedImage) return undefined
+    if (!expandedImage && !listOpen) return undefined
 
     const previousOverflow = document.body.style.overflow
     const closeOnEscape = (event) => {
-      if (event.key === 'Escape') setExpandedImage(false)
+      if (event.key !== 'Escape') return
+      if (expandedImage) setExpandedImage(false)
+      else setListOpen(false)
     }
     document.body.style.overflow = 'hidden'
     window.addEventListener('keydown', closeOnEscape)
@@ -59,7 +66,11 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
       document.body.style.overflow = previousOverflow
       window.removeEventListener('keydown', closeOnEscape)
     }
-  }, [expandedImage])
+  }, [expandedImage, listOpen])
+
+  useEffect(() => {
+    if (listOpen) listCloseButtonRef.current?.focus()
+  }, [listOpen])
 
   const totalUnits = useMemo(
     () => orderedItems.reduce((total, item) => total + item.quantity, 0),
@@ -74,6 +85,46 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
     : 0
   const isComplete = totalUnits > 0 && pickedUnits === totalUnits
   const progress = totalUnits ? Math.round((pickedUnits / totalUnits) * 100) : 0
+
+  function scrollToCurrentProduct() {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        productCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      })
+    })
+  }
+
+  function closeList() {
+    setListOpen(false)
+    window.requestAnimationFrame(() => listButtonRef.current?.focus())
+  }
+
+  function showItem(index) {
+    const nextIndex = Math.max(0, Math.min(orderedItems.length - 1, index))
+    setCurrentIndex(nextIndex)
+    setExpandedImage(false)
+    setListOpen(false)
+    scrollToCurrentProduct()
+  }
+
+  function handleTouchStart(event) {
+    const touch = event.touches[0]
+    swipeStart.current = touch ? { x: touch.clientX, y: touch.clientY } : null
+  }
+
+  function handleTouchEnd(event) {
+    const start = swipeStart.current
+    const touch = event.changedTouches[0]
+    swipeStart.current = null
+    if (!start || !touch) return
+
+    const horizontalDistance = touch.clientX - start.x
+    const verticalDistance = touch.clientY - start.y
+    if (Math.abs(horizontalDistance) < 55 || Math.abs(horizontalDistance) < Math.abs(verticalDistance) * 1.2) return
+
+    if (horizontalDistance < 0 && currentIndex < orderedItems.length - 1) showItem(currentIndex + 1)
+    if (horizontalDistance > 0 && currentIndex > 0) showItem(currentIndex - 1)
+  }
 
   function incrementCurrentItem() {
     if (!currentItem) return
@@ -93,6 +144,7 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
           if (candidatePicked < candidate.quantity) {
             setCurrentIndex(candidateIndex)
             setExpandedImage(false)
+            scrollToCurrentProduct()
             break
           }
         }
@@ -109,11 +161,6 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
       ...current,
       [currentItem.id]: Math.max(0, currentPickedQuantity - 1),
     }))
-  }
-
-  function showItem(index) {
-    setCurrentIndex(index)
-    setExpandedImage(false)
   }
 
   function clearProgress() {
@@ -223,7 +270,13 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
             <button className="text-button" type="button" onClick={clearProgress}>Start this list over</button>
           </section>
         ) : (
-          <section className="mobile-product-card">
+          <section
+            className="mobile-product-card"
+            ref={productCardRef}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            aria-label={`${currentItem.productTitle}. Swipe left or right to change products.`}
+          >
             <div className="mobile-position">Product {currentIndex + 1} of {orderedItems.length}</div>
             <div className="mobile-product-overview">
               <button
@@ -283,60 +336,108 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
               ))}
             </div>
 
-            <div className="mobile-navigation">
-              <Button
-                disabled={currentIndex === 0}
-                onClick={() => showItem(Math.max(0, currentIndex - 1))}
-              >
-                Previous
-              </Button>
-              <Button
-                disabled={currentIndex === orderedItems.length - 1}
-                onClick={() => showItem(Math.min(orderedItems.length - 1, currentIndex + 1))}
-              >
-                Next
-              </Button>
-            </div>
           </section>
         )}
 
-        <section className="pick-queue">
-          <div className="queue-heading">
-            <Text variant="headingMd" as="h2">Pick list</Text>
-            <button className="text-button" type="button" onClick={clearProgress}>Reset</button>
-          </div>
-          <div className="queue-items">
-            {orderedItems.map((item, index) => {
-              const itemPickedQuantity = Math.min(
-                Number(pickedQuantities[item.id]) || 0,
-                item.quantity,
-              )
-              const picked = itemPickedQuantity === item.quantity
-              return (
+        {!isComplete ? (
+          <nav className="mobile-bottom-nav" aria-label="Product navigation">
+            <button
+              className="mobile-nav-button"
+              type="button"
+              disabled={currentIndex === 0}
+              onClick={() => showItem(currentIndex - 1)}
+            >
+              <span aria-hidden="true">←</span>
+              <span>Previous</span>
+            </button>
+            <button
+              className="mobile-nav-button mobile-nav-button--list"
+              type="button"
+              ref={listButtonRef}
+              onClick={() => setListOpen(true)}
+              aria-haspopup="dialog"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" />
+              </svg>
+              <span>List</span>
+              <span className="mobile-nav-count">{currentIndex + 1}/{orderedItems.length}</span>
+            </button>
+            <button
+              className="mobile-nav-button"
+              type="button"
+              disabled={currentIndex === orderedItems.length - 1}
+              onClick={() => showItem(currentIndex + 1)}
+            >
+              <span>Next</span>
+              <span aria-hidden="true">→</span>
+            </button>
+          </nav>
+        ) : null}
+
+        {listOpen ? (
+          <div className="pick-list-modal" role="presentation" onClick={closeList}>
+            <section
+              className="pick-list-modal-panel"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="pick-list-title"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <header className="pick-list-modal-header">
+                <div>
+                  <Text variant="headingLg" as="h2" id="pick-list-title">Pick list</Text>
+                  <p>{pickedUnits} of {totalUnits} units picked</p>
+                </div>
                 <button
-                  className={`queue-item ${index === currentIndex ? 'is-current' : ''} ${picked ? 'is-picked' : ''}`}
+                  className="modal-close-button"
                   type="button"
-                  key={item.id}
-                  onClick={() => showItem(index)}
-                  aria-pressed={index === currentIndex}
+                  ref={listCloseButtonRef}
+                  onClick={closeList}
+                  aria-label="Close pick list"
                 >
-                  <span className="queue-thumbnail">
-                    <img src={item.image} alt="" />
-                    {picked ? <span className="queue-picked-check" aria-hidden="true">✓</span> : null}
-                    {!picked && itemPickedQuantity > 0 ? (
-                      <span className="queue-partial-count">{itemPickedQuantity}/{item.quantity}</span>
-                    ) : null}
-                  </span>
-                  <span className="queue-copy">
-                    <strong>{item.productTitle}</strong>
-                    <span>{item.attributes || item.sku || 'No variant'}</span>
-                  </span>
-                  <span className="queue-quantity">× {item.quantity}</span>
+                  ×
                 </button>
-              )
-            })}
+              </header>
+              <div className="pick-list-modal-actions">
+                <span>Tap a product to jump to it</span>
+                <button className="text-button" type="button" onClick={clearProgress}>Reset progress</button>
+              </div>
+              <div className="queue-items">
+                {orderedItems.map((item, index) => {
+                  const itemPickedQuantity = Math.min(
+                    Number(pickedQuantities[item.id]) || 0,
+                    item.quantity,
+                  )
+                  const picked = itemPickedQuantity === item.quantity
+                  return (
+                    <button
+                      className={`queue-item ${index === currentIndex ? 'is-current' : ''} ${picked ? 'is-picked' : ''}`}
+                      type="button"
+                      key={item.id}
+                      onClick={() => showItem(index)}
+                      aria-pressed={index === currentIndex}
+                      aria-label={`${item.productTitle}, ${itemPickedQuantity} of ${item.quantity} picked`}
+                    >
+                      <span className="queue-thumbnail">
+                        <img src={item.image} alt="" />
+                        {picked ? <span className="queue-picked-check" aria-hidden="true">✓</span> : null}
+                        {!picked && itemPickedQuantity > 0 ? (
+                          <span className="queue-partial-count">{itemPickedQuantity}/{item.quantity}</span>
+                        ) : null}
+                      </span>
+                      <span className="queue-copy">
+                        <strong>{item.productTitle}</strong>
+                        <span>{item.attributes || item.sku || 'No variant'}</span>
+                      </span>
+                      <span className="queue-quantity">{itemPickedQuantity}/{item.quantity}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </section>
           </div>
-        </section>
+        ) : null}
 
         {expandedImage ? (
           <div
