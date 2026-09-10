@@ -818,7 +818,7 @@ input {
   position: fixed;
   z-index: 100;
   right: 0;
-  bottom: max(0.7rem, env(safe-area-inset-bottom));
+  bottom: 0.45rem;
   left: 0;
   display: grid;
   grid-template-columns: 1fr 1.12fr 1fr;
@@ -884,8 +884,7 @@ input {
   display: grid;
   width: 100vw;
   height: 100dvh;
-  padding: max(0.65rem, env(safe-area-inset-top)) max(0.65rem, env(safe-area-inset-right))
-    max(0.65rem, env(safe-area-inset-bottom)) max(0.65rem, env(safe-area-inset-left));
+  padding: 0.65rem;
   place-items: center;
   background: rgb(18 18 18 / 48%);
 }
@@ -1216,8 +1215,7 @@ input {
   }
 
   .pick-list-modal {
-    padding: max(0.45rem, env(safe-area-inset-top)) max(0.45rem, env(safe-area-inset-right))
-      max(0.45rem, env(safe-area-inset-bottom)) max(0.45rem, env(safe-area-inset-left));
+    padding: 0.45rem;
   }
 
   .pick-list-modal-panel {
