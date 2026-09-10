@@ -2,12 +2,15 @@ import express from 'express'
 import dotenv from 'dotenv'
 import axios from 'axios'
 import cors from 'cors'
+import tagOrdersHandler from './api/tag-orders.js'
 
 dotenv.config()
 
 const app = express()
 app.use(cors())
 app.use(express.json())
+
+app.post('/api/tag-orders', tagOrdersHandler)
 
 const PORT = 3001
 

@@ -15,6 +15,21 @@ function readProgress(storageKey) {
   }
 }
 
+function readSkippedItems(storageKey) {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(storageKey) || '[]')
+    return Array.isArray(stored) ? stored : []
+  } catch {
+    return []
+  }
+}
+
+function formatItemLabel(item) {
+  const details = [item.productTitle, item.attributes, item.sku ? `SKU ${item.sku}` : '']
+    .filter(Boolean)
+  return details.join(' — ')
+}
+
 function MobilePicker({ selectedOrders, onBack, onHome }) {
   const { items, loading, error, retry } = usePickListData(selectedOrders)
   const orderedItems = useMemo(() => [...items].sort((first, second) => (
@@ -25,10 +40,13 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
   const storageKey = useMemo(() => (
     `monods-mobile-pick:${selectedOrders.map((order) => order.id).sort().join('-')}`
   ), [selectedOrders])
+  const skippedStorageKey = `${storageKey}:skipped`
   const [pickedQuantities, setPickedQuantities] = useState(() => readProgress(storageKey))
+  const [skippedItemIds, setSkippedItemIds] = useState(() => readSkippedItems(skippedStorageKey))
   const [currentIndex, setCurrentIndex] = useState(0)
   const [expandedImage, setExpandedImage] = useState(false)
   const [listOpen, setListOpen] = useState(false)
+  const [reviewingItems, setReviewingItems] = useState(false)
   const [finishing, setFinishing] = useState(false)
   const [finishError, setFinishError] = useState('')
   const positionedInitialItem = useRef(false)
@@ -40,15 +58,22 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
   useEffect(() => {
     if (orderedItems.length === 0 || positionedInitialItem.current) return
     const firstUnpicked = orderedItems.findIndex(
-      (item) => Math.min(Number(pickedQuantities[item.id]) || 0, item.quantity) < item.quantity,
+      (item) => (
+        Math.min(Number(pickedQuantities[item.id]) || 0, item.quantity) < item.quantity
+          && !skippedItemIds.includes(item.id)
+      ),
     )
     setCurrentIndex(firstUnpicked === -1 ? orderedItems.length - 1 : firstUnpicked)
     positionedInitialItem.current = true
-  }, [orderedItems, pickedQuantities])
+  }, [orderedItems, pickedQuantities, skippedItemIds])
 
   useEffect(() => {
     window.localStorage.setItem(storageKey, JSON.stringify(pickedQuantities))
   }, [pickedQuantities, storageKey])
+
+  useEffect(() => {
+    window.localStorage.setItem(skippedStorageKey, JSON.stringify(skippedItemIds))
+  }, [skippedItemIds, skippedStorageKey])
 
   useEffect(() => {
     if (!expandedImage && !listOpen) return undefined
@@ -80,10 +105,22 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
     total + Math.min(Number(pickedQuantities[item.id]) || 0, item.quantity)
   ), 0), [orderedItems, pickedQuantities])
   const currentItem = orderedItems[currentIndex]
+  const skippedItemIdSet = useMemo(() => new Set(skippedItemIds), [skippedItemIds])
   const currentPickedQuantity = currentItem
     ? Math.min(Number(pickedQuantities[currentItem.id]) || 0, currentItem.quantity)
     : 0
+  const skippedUnits = useMemo(() => orderedItems.reduce((total, item) => (
+    skippedItemIdSet.has(item.id)
+      ? total + Math.max(0, item.quantity - Math.min(Number(pickedQuantities[item.id]) || 0, item.quantity))
+      : total
+  ), 0), [orderedItems, pickedQuantities, skippedItemIdSet])
   const isComplete = totalUnits > 0 && pickedUnits === totalUnits
+  const isReadyToFinish = orderedItems.length > 0 && orderedItems.every((item) => (
+    Math.min(Number(pickedQuantities[item.id]) || 0, item.quantity) === item.quantity
+      || skippedItemIdSet.has(item.id)
+  ))
+  const isCurrentSkipped = currentItem ? skippedItemIdSet.has(currentItem.id) : false
+  const showCompletion = isReadyToFinish && !reviewingItems
   const progress = totalUnits ? Math.round((pickedUnits / totalUnits) * 100) : 0
 
   function scrollToCurrentProduct() {
@@ -104,6 +141,7 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
     setCurrentIndex(nextIndex)
     setExpandedImage(false)
     setListOpen(false)
+    setReviewingItems(true)
     scrollToCurrentProduct()
   }
 
@@ -126,6 +164,18 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
     if (horizontalDistance > 0 && currentIndex > 0) showItem(currentIndex - 1)
   }
 
+  function findNextUnresolved(startIndex, quantities, skippedIds) {
+    for (let offset = 1; offset <= orderedItems.length; offset += 1) {
+      const candidateIndex = (startIndex + offset) % orderedItems.length
+      const candidate = orderedItems[candidateIndex]
+      const candidatePicked = Math.min(Number(quantities[candidate.id]) || 0, candidate.quantity)
+      if (candidatePicked < candidate.quantity && !skippedIds.has(candidate.id)) {
+        return candidateIndex
+      }
+    }
+    return null
+  }
+
   function incrementCurrentItem() {
     if (!currentItem) return
 
@@ -137,16 +187,13 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
       const next = { ...current, [currentItem.id]: nextQuantity }
 
       if (nextQuantity === currentItem.quantity) {
-        for (let offset = 1; offset <= orderedItems.length; offset += 1) {
-          const candidateIndex = (currentIndex + offset) % orderedItems.length
-          const candidate = orderedItems[candidateIndex]
-          const candidatePicked = Math.min(Number(next[candidate.id]) || 0, candidate.quantity)
-          if (candidatePicked < candidate.quantity) {
-            setCurrentIndex(candidateIndex)
-            setExpandedImage(false)
-            scrollToCurrentProduct()
-            break
-          }
+        const candidateIndex = findNextUnresolved(currentIndex, next, skippedItemIdSet)
+        if (candidateIndex !== null) {
+          setCurrentIndex(candidateIndex)
+          setExpandedImage(false)
+          scrollToCurrentProduct()
+        } else {
+          setReviewingItems(false)
         }
       }
 
@@ -163,9 +210,67 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
     }))
   }
 
+  function toggleCurrentSkip() {
+    if (!currentItem || currentPickedQuantity === currentItem.quantity) return
+
+    const nextSkippedIds = new Set(skippedItemIds)
+    if (isCurrentSkipped) {
+      nextSkippedIds.delete(currentItem.id)
+      setSkippedItemIds([...nextSkippedIds])
+      return
+    }
+
+    nextSkippedIds.add(currentItem.id)
+    setSkippedItemIds([...nextSkippedIds])
+    const candidateIndex = findNextUnresolved(currentIndex, pickedQuantities, nextSkippedIds)
+    if (candidateIndex !== null) {
+      setCurrentIndex(candidateIndex)
+      setExpandedImage(false)
+      scrollToCurrentProduct()
+    } else {
+      setReviewingItems(false)
+    }
+  }
+
   function clearProgress() {
     setPickedQuantities({})
+    setSkippedItemIds([])
     setCurrentIndex(0)
+    setReviewingItems(false)
+  }
+
+  function buildOrderResults() {
+    return selectedOrders.flatMap((order) => {
+      const orderItems = orderedItems.flatMap((item) => {
+        const orderEntry = item.orders.find((entry) => entry.id === order.id)
+        return orderEntry ? [{ item, orderQuantity: orderEntry.quantity }] : []
+      })
+      const hasPickedUnits = orderItems.some(({ item }) => (
+        Math.min(Number(pickedQuantities[item.id]) || 0, item.quantity) > 0
+      ))
+
+      if (!hasPickedUnits) return []
+
+      const fullyPicked = orderItems.every(({ item }) => (
+        Math.min(Number(pickedQuantities[item.id]) || 0, item.quantity) === item.quantity
+      ))
+      const summaryLines = orderItems.map(({ item, orderQuantity }) => {
+        const pickedQuantity = Math.min(Number(pickedQuantities[item.id]) || 0, item.quantity)
+        const label = formatItemLabel(item)
+        if (pickedQuantity === item.quantity) return `Picked: ${label} ×${orderQuantity}`
+        if (pickedQuantity > 0) {
+          const sharedText = item.orders.length > 1 ? ' across selected orders' : ''
+          return `Partial: ${label} — ${pickedQuantity}/${item.quantity} picked${sharedText}; this order needs ${orderQuantity}`
+        }
+        return `Not picked: ${label} ×${orderQuantity}${skippedItemIdSet.has(item.id) ? ' (skipped)' : ''}`
+      })
+
+      return [{
+        id: order.id,
+        status: fullyPicked ? 'picked' : 'partial',
+        summary: summaryLines.join('\n').slice(0, 4000),
+      }]
+    })
   }
 
   async function finishSession() {
@@ -173,17 +278,18 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
     setFinishError('')
 
     try {
-      const response = await fetch('/api/tag-orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderIds: [...new Set(selectedOrders.map((order) => order.id))],
-          tag: 'PLP-PICKED',
-        }),
-      })
-      if (!response.ok) throw new Error(`Saving picked status failed (${response.status})`)
+      const orderResults = buildOrderResults()
+      if (orderResults.length > 0) {
+        const response = await fetch('/api/tag-orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderResults }),
+        })
+        if (!response.ok) throw new Error(`Saving picked status failed (${response.status})`)
+      }
 
       window.localStorage.removeItem(storageKey)
+      window.localStorage.removeItem(skippedStorageKey)
       onHome()
     } catch (saveError) {
       console.error('Failed to save picked order status', saveError)
@@ -238,35 +344,53 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
           <button className="text-back" type="button" onClick={onHome}>Picking options</button>
         </header>
 
-        <section className="mobile-progress" aria-label={`${pickedUnits} of ${totalUnits} units picked`}>
+        <section
+          className="mobile-progress"
+          aria-label={`${pickedUnits} of ${totalUnits} units picked${skippedUnits ? `, ${skippedUnits} skipped` : ''}`}
+        >
           <div className="mobile-progress-copy">
             <div>
               <span className="mobile-eyebrow">MOBILE PICKING</span>
               <Text variant="headingLg" as="h1">{pickedUnits} of {totalUnits} units picked</Text>
+              {skippedUnits ? <span className="mobile-skipped-summary">{skippedUnits} skipped</span> : null}
             </div>
             <strong>{progress}%</strong>
           </div>
           <div className="progress-track"><span style={{ width: `${progress}%` }} /></div>
         </section>
 
-        {isComplete ? (
+        {showCompletion ? (
           <section className="completion-card">
-            <div className="completion-check">✓</div>
-            <Text variant="headingXl" as="h2">That’s the lot.</Text>
-            <p>
-              All {totalUnits} {totalUnits === 1 ? 'unit' : 'units'} for{' '}
-              {selectedOrders.length} {selectedOrders.length === 1 ? 'order' : 'orders'}{' '}
-              {totalUnits === 1 ? 'is' : 'are'} marked picked.
-            </p>
+            <div className={`completion-check ${isComplete ? '' : 'is-partial'}`}>
+              {isComplete ? '✓' : '!'}
+            </div>
+            <Text variant="headingXl" as="h2">{isComplete ? 'That’s the lot.' : 'Pick list reviewed'}</Text>
+            {isComplete ? (
+              <p>
+                All {totalUnits} {totalUnits === 1 ? 'unit' : 'units'} for{' '}
+                {selectedOrders.length} {selectedOrders.length === 1 ? 'order' : 'orders'}{' '}
+                {totalUnits === 1 ? 'is' : 'are'} marked picked.
+              </p>
+            ) : (
+              <p>
+                {pickedUnits} of {totalUnits} units picked. {skippedUnits}{' '}
+                {skippedUnits === 1 ? 'unit was' : 'units were'} skipped and will remain visible as needing attention.
+              </p>
+            )}
             <Button
               variant="primary"
               size="large"
               loading={finishing}
               onClick={finishSession}
             >
-              Save picked status and finish
+              {pickedUnits > 0 ? 'Save results and finish' : 'Finish without changing orders'}
             </Button>
             {finishError ? <p className="finish-error" role="alert">{finishError}</p> : null}
+            {!isComplete ? (
+              <button className="text-button" type="button" onClick={() => setListOpen(true)}>
+                Review items
+              </button>
+            ) : null}
             <button className="text-button" type="button" onClick={clearProgress}>Start this list over</button>
           </section>
         ) : (
@@ -305,18 +429,33 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
               <div><span>On hand</span><strong>{currentItem.stock}</strong></div>
             </div>
 
-            <button
-              className={`pick-action ${currentPickedQuantity === currentItem.quantity ? 'is-picked' : ''}`}
-              type="button"
-              onClick={incrementCurrentItem}
-              disabled={currentPickedQuantity === currentItem.quantity}
-            >
-              {currentPickedQuantity === currentItem.quantity
-                ? '✓ All units picked'
-                : `Mark 1 picked (${currentPickedQuantity + 1} of ${currentItem.quantity})`}
-            </button>
+            <div className="mobile-pick-actions">
+              <button
+                className={`pick-action ${currentPickedQuantity === currentItem.quantity ? 'is-picked' : ''}`}
+                type="button"
+                onClick={incrementCurrentItem}
+                disabled={currentPickedQuantity === currentItem.quantity || isCurrentSkipped}
+              >
+                {currentPickedQuantity === currentItem.quantity
+                  ? '✓ All units picked'
+                  : isCurrentSkipped
+                    ? 'Skipped — undo to pick'
+                    : `Mark 1 picked (${currentPickedQuantity + 1} of ${currentItem.quantity})`}
+              </button>
+              <button
+                className={`skip-action ${isCurrentSkipped ? 'is-skipped' : ''}`}
+                type="button"
+                onClick={toggleCurrentSkip}
+                disabled={currentPickedQuantity === currentItem.quantity}
+              >
+                {isCurrentSkipped ? 'Undo skip' : 'Skip'}
+              </button>
+            </div>
             <div className="partial-pick-status" aria-live="polite">
-              <span><strong>{currentPickedQuantity}</strong> of {currentItem.quantity} picked</span>
+              <span>
+                <strong>{currentPickedQuantity}</strong> of {currentItem.quantity} picked
+                {isCurrentSkipped ? ' · remainder skipped' : ''}
+              </span>
               <button
                 className="text-button"
                 type="button"
@@ -339,7 +478,7 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
           </section>
         )}
 
-        {!isComplete ? (
+        {!showCompletion ? (
           <nav className="mobile-bottom-nav" aria-label="Product navigation">
             <button
               className="mobile-nav-button"
@@ -387,7 +526,10 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
               <header className="pick-list-modal-header">
                 <div>
                   <Text variant="headingLg" as="h2" id="pick-list-title">Pick list</Text>
-                  <p>{pickedUnits} of {totalUnits} units picked</p>
+                  <p>
+                    {pickedUnits} of {totalUnits} units picked
+                    {skippedUnits ? ` · ${skippedUnits} skipped` : ''}
+                  </p>
                 </div>
                 <button
                   className="modal-close-button"
@@ -410,14 +552,15 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
                     item.quantity,
                   )
                   const picked = itemPickedQuantity === item.quantity
+                  const skipped = skippedItemIdSet.has(item.id)
                   return (
                     <button
-                      className={`queue-item ${index === currentIndex ? 'is-current' : ''} ${picked ? 'is-picked' : ''}`}
+                      className={`queue-item ${index === currentIndex ? 'is-current' : ''} ${picked ? 'is-picked' : ''} ${skipped ? 'is-skipped' : ''}`}
                       type="button"
                       key={item.id}
                       onClick={() => showItem(index)}
                       aria-pressed={index === currentIndex}
-                      aria-label={`${item.productTitle}, ${itemPickedQuantity} of ${item.quantity} picked`}
+                      aria-label={`${item.productTitle}, ${itemPickedQuantity} of ${item.quantity} picked${skipped ? ', skipped' : ''}`}
                     >
                       <span className="queue-thumbnail">
                         <img src={item.image} alt="" />
@@ -430,7 +573,9 @@ function MobilePicker({ selectedOrders, onBack, onHome }) {
                         <strong>{item.productTitle}</strong>
                         <span>{item.attributes || item.sku || 'No variant'}</span>
                       </span>
-                      <span className="queue-quantity">{itemPickedQuantity}/{item.quantity}</span>
+                      <span className={`queue-quantity ${skipped ? 'is-skipped' : ''}`}>
+                        {skipped ? 'Skipped' : `${itemPickedQuantity}/${item.quantity}`}
+                      </span>
                     </button>
                   )
                 })}

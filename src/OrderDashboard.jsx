@@ -40,17 +40,32 @@ function hasTag(order, expectedTag) {
 
 function PickingStatus({ order }) {
   const pickedAt = getNoteAttribute(order, 'pick_list_picked_at')
+  const partialAt = getNoteAttribute(order, 'pick_list_partial_at')
   const printedAt = getNoteAttribute(order, 'pick_list_printed_at')
+  const pickSummary = getNoteAttribute(order, 'pick_list_summary')
   const wasPicked = hasTag(order, 'PLP-PICKED') || Boolean(pickedAt)
+  const wasPartiallyPicked = hasTag(order, 'PLP-PARTIAL') || Boolean(partialAt)
   const wasPrinted = hasTag(order, 'PLP') || Boolean(printedAt)
 
-  if (!wasPicked && !wasPrinted) {
+  if (!wasPicked && !wasPartiallyPicked && !wasPrinted) {
     return <span className="muted-text">Not started</span>
   }
 
   return (
     <div className="picking-statuses">
-      {wasPicked ? (
+      {wasPartiallyPicked ? (
+        <>
+          <span className="picking-status picking-status--partial" title={pickSummary || undefined}>
+            {formatPickingStatus('Partially picked', partialAt)}
+          </span>
+          {pickSummary ? (
+            <details className="picking-status-details">
+              <summary>View item summary</summary>
+              <div>{pickSummary}</div>
+            </details>
+          ) : null}
+        </>
+      ) : wasPicked ? (
         <span className="picking-status picking-status--picked">
           {formatPickingStatus('Picked', pickedAt)}
         </span>

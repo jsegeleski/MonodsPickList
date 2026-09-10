@@ -308,6 +308,34 @@ input {
   background: #e7f5ee;
 }
 
+.picking-status--partial {
+  border-color: #e3c990;
+  color: #5d4214;
+  background: #fff8e7;
+}
+
+.picking-status-details {
+  max-width: 18rem;
+  color: #5f5f5f;
+  font-size: 0.7rem;
+}
+
+.picking-status-details summary {
+  color: #3f5f86;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.picking-status-details > div {
+  margin-top: 0.35rem;
+  padding: 0.55rem;
+  border: 1px solid #dedede;
+  border-radius: 7px;
+  background: #fff;
+  line-height: 1.4;
+  white-space: pre-line;
+}
+
 .picking-status--printed {
   border-color: #b8d7f0;
   color: #17476d;
@@ -737,6 +765,38 @@ input {
   cursor: pointer;
 }
 
+.mobile-pick-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+.skip-action {
+  min-width: 4.7rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #c9c9c9;
+  border-radius: 12px;
+  color: #4a4a4a;
+  background: #fff;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.skip-action.is-skipped {
+  border-color: #d6b66e;
+  color: #624713;
+  background: #fff7e3;
+}
+
+.skip-action:disabled {
+  color: #a3a3a3;
+  background: #f5f5f5;
+  cursor: default;
+}
+
 .image-lightbox {
   position: fixed;
   z-index: 10000;
@@ -791,6 +851,21 @@ input {
   color: #315f4d;
   background: #e1f1e9;
   box-shadow: 0 2px 0 #a9cdbb;
+}
+
+.pick-action:disabled:not(.is-picked) {
+  color: #777;
+  background: #ededed;
+  box-shadow: none;
+  cursor: default;
+}
+
+.mobile-skipped-summary {
+  display: block;
+  margin-top: 0.15rem;
+  color: #725619;
+  font-size: 0.72rem;
+  font-weight: 650;
 }
 
 .partial-pick-status {
@@ -987,6 +1062,10 @@ input {
   background: #f4f7f5;
 }
 
+.queue-item.is-skipped {
+  background: #fffaf0;
+}
+
 .queue-thumbnail {
   position: relative;
   display: block;
@@ -1070,6 +1149,11 @@ input {
   font-weight: 700;
 }
 
+.queue-quantity.is-skipped {
+  color: #725619;
+  font-size: 0.68rem;
+}
+
 .completion-card {
   display: flex;
   min-height: 390px;
@@ -1090,6 +1174,11 @@ input {
   color: #fff;
   background: #3f7d64;
   font-size: 2rem;
+}
+
+.completion-check.is-partial {
+  color: #624713;
+  background: #f5d995;
 }
 
 .completion-card p {
