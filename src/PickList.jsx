@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Button, Card, Page, Text } from '@shopify/polaris'
 import FunnyLoading from './FunnyLoading'
 import usePickListData from './usePickListData'
+import { createPickListPrintHtml, waitForPrintDocument } from './printPickList'
 
 function formatNow() {
   return new Date().toLocaleString('en-CA', {
@@ -16,6 +17,7 @@ function formatNow() {
 function PickList({ selectedOrders, onBack, onHome }) {
   const { items, loading, error, retry } = usePickListData(selectedOrders)
   const [printing, setPrinting] = useState(false)
+  const [printError, setPrintError] = useState('')
   const [generatedAt] = useState(formatNow)
 
   const groupedByType = useMemo(() => items.reduce((groups, item) => {
@@ -31,7 +33,22 @@ function PickList({ selectedOrders, onBack, onHome }) {
   )
 
   async function printList() {
+    setPrintError('')
+    const printWindow = window.open('', 'monods-pick-list-print', 'width=1100,height=850')
+    if (!printWindow) {
+      setPrintError('The print window was blocked. Allow pop-ups for this app, then try again.')
+      return
+    }
+
+    printWindow.opener = null
+    printWindow.document.open()
+    printWindow.document.write(`<!doctype html><title>Preparing pick list...</title>
+      <style>body{display:grid;min-height:100vh;margin:0;place-items:center;color:#444;font:16px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}</style>
+      <p>Preparing the complete pick list...</p>`)
+    printWindow.document.close()
     setPrinting(true)
+    let statusWarning = ''
+
     try {
       const response = await fetch('/api/tag-orders', {
         method: 'POST',
@@ -44,9 +61,24 @@ function PickList({ selectedOrders, onBack, onHome }) {
       if (!response.ok) throw new Error(`Tagging orders failed (${response.status})`)
     } catch (tagError) {
       console.error('Failed to tag orders as printed', tagError)
+      statusWarning = 'The list is ready to print, but the printed status could not be saved to Shopify.'
+    }
+
+    try {
+      if (printWindow.closed) throw new Error('The print window was closed')
+      printWindow.document.open()
+      printWindow.document.write(createPickListPrintHtml({ items, selectedOrders, generatedAt }))
+      printWindow.document.close()
+      await waitForPrintDocument(printWindow)
+      printWindow.focus()
+      printWindow.print()
+      setPrintError(statusWarning)
+    } catch (printDocumentError) {
+      console.error('Failed to prepare printable pick list', printDocumentError)
+      if (!printWindow.closed) printWindow.close()
+      setPrintError('The printable pick list could not be prepared. Please try again.')
     } finally {
       setPrinting(false)
-      window.print()
     }
   }
 
@@ -89,9 +121,12 @@ function PickList({ selectedOrders, onBack, onHome }) {
               <span>{totalUnits} units</span>
             </div>
           </div>
-          <div className="button-row no-print">
-            <Button onClick={onBack}>Back</Button>
-            <Button variant="primary" loading={printing} onClick={printList}>Print list</Button>
+          <div className="print-controls no-print">
+            <div className="button-row">
+              <Button onClick={onBack}>Back</Button>
+              <Button variant="primary" loading={printing} onClick={printList}>Print complete list</Button>
+            </div>
+            {printError ? <p className="print-error" role="alert">{printError}</p> : null}
           </div>
         </header>
 

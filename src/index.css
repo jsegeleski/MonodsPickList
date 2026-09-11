@@ -50,6 +50,22 @@ input {
   font-size: 0.875rem;
 }
 
+.print-controls {
+  display: flex;
+  max-width: 23rem;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.print-error {
+  margin: 0;
+  color: #8e1f0b;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  text-align: right;
+}
+
 .text-back,
 .text-button {
   padding: 0;
@@ -1328,6 +1344,16 @@ input {
   @page {
     size: auto;
     margin: 10mm;
+  }
+
+  html,
+  body,
+  #root {
+    width: auto !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
   }
 
   html,
